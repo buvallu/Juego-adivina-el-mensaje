@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Mensaje de las Luces - Stranger Things</title>
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: #b9b9b9;
+    background-image: radial-gradient(#8a8a8a 1.5px, transparent 1.5px);
+    background-size: 22px 22px;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 15px 60px;
+    box-sizing: border-box;
+  }
+  h1 {
+    color: #d61f1f;
+    text-shadow: 2px 2px 0 #000;
+    letter-spacing: 3px;
+    font-size: 1.6em;
+    text-align: center;
+  }
+  .row {
+    position: relative;
+    margin: 30px 0 10px;
+    width: 100%;
+    max-width: 620px;
+  }
+  .wire {
+    position: absolute;
+    top: 18px;
+    left: 0;
+    width: 100%;
+    height: 20px;
+    border-bottom: 3px solid #000;
+    border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  }
+  .letters {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .letter-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 11%;
+  }
+  .bulb {
+    width: 26px;
+    height: 32px;
+    border-radius: 50% 50% 45% 45%;
+    background: #555;
+    opacity: 0.35;
+    box-shadow: inset -3px -3px 4px rgba(0,0,0,0.4);
+    transition: all 0.25s ease;
+    margin-bottom: 6px;
+  }
+  .bulb.on {
+    opacity: 1;
+    box-shadow: 0 0 20px 8px currentColor, inset -3px -3px 4px rgba(0,0,0,0.3);
+  }
+  .letter {
+    font-weight: bold;
+    font-size: 1.4em;
+    color: #111;
+  }
+  .controls {
+    margin-top: 30px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  button {
+    background: #d61f1f;
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    font-family: inherit;
+    font-weight: bold;
+    letter-spacing: 1px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95em;
+  }
+  button:disabled { background: #888; cursor: not-allowed; }
+  button:hover:not(:disabled) { background: #a81414; }
+  .answer-box {
+    margin-top: 25px;
+    text-align: center;
+  }
+  input[type="text"] {
+    padding: 10px;
+    font-size: 1em;
+    border-radius: 6px;
+    border: 2px solid #000;
+    text-transform: uppercase;
+    width: 260px;
+    max-width: 80vw;
+  }
+  .spelled {
+    margin-top: 15px;
+    font-size: 1.3em;
+    letter-spacing: 4px;
+    color: #000;
+    min-height: 1.5em;
+    font-weight: bold;
+  }
+  .message {
+    margin-top: 15px;
+    font-size: 1.1em;
+    font-weight: bold;
+    min-height: 1.5em;
+    text-align: center;
+  }
+  .message.win { color: #1f8a2e; }
+  .message.lose { color: #d61f1f; }
+</style>
+</head>
+<body>
+
+<h1>Que esta diciendo Will?</h1>
+<p style="text-align:center; max-width:500px;">Presiona el boton y observa que letras se iluminan. Cuando termine, escribe el mensaje completo.</p>
+
+<div id="board"></div>
+
+<div class="controls">
+  <button id="startBtn">Iniciar mensaje</button>
+  <button id="replayBtn" disabled>Repetir secuencia</button>
+  <button id="hintBtn" disabled>Pista</button>
+</div>
+
+<div class="spelled" id="spelled"></div>
+
+<div class="answer-box">
+  <input type="text" id="guessInput" placeholder="Escribe el mensaje aqui" disabled>
+  <br><br>
+  <button id="guessBtn" disabled>Adivinar</button>
+</div>
+
+<div class="message" id="message"></div>
+
+<script>
+  const ROWS = [
+    "ABCDEFGH",
+    "IJKLMNOPQ",
+    "RSTUVWXYZ"
+  ];
+
+  const COLORS = ["#e0d8c3", "#3fa9f5", "#e23b3b", "#5bbf5b", "#f2d13c"];
+
+  const MESSAGES = [
+    "FRIENDS DONT LIE",
+    "WELCOME TO HAWKINS"
+  ];
+
+  let currentMessage = "";
+  let bulbMap = {};
+  let sequenceRunning = false;
+
+  const board = document.getElementById("board");
+  const spelledEl = document.getElementById("spelled");
+  const messageEl = document.getElementById("message");
+  const startBtn = document.getElementById("startBtn");
+  const replayBtn = document.getElementById("replayBtn");
+  const hintBtn = document.getElementById("hintBtn");
+  const guessInput = document.getElementById("guessInput");
+  const guessBtn = document.getElementById("guessBtn");
+
+  function buildBoard() {
+    board.innerHTML = "";
+    let colorIndex = 0;
+    ROWS.forEach(row => {
+      const rowDiv = document.createElement("div");
+      rowDiv.className = "row";
+      const wire = document.createElement("div");
+      wire.className = "wire";
+      rowDiv.appendChild(wire);
+
+      const lettersDiv = document.createElement("div");
+      lettersDiv.className = "letters";
+
+      [...row].forEach(ch => {
+        const block = document.createElement("div");
+        block.className = "letter-block";
+
+        const bulb = document.createElement("div");
+        bulb.className = "bulb";
+        const color = COLORS[colorIndex % COLORS.length];
+        bulb.style.color = color;
+        bulb.style.background = color;
+        bulb.id = "bulb-" + ch;
+        colorIndex++;
+
+        const letter = document.createElement("div");
+        letter.className = "letter";
+        letter.textContent = ch;
+
+        block.appendChild(bulb);
+        block.appendChild(letter);
+        lettersDiv.appendChild(block);
+        bulbMap[ch] = bulb;
+      });
+
+      rowDiv.appendChild(lettersDiv);
+      board.appendChild(rowDiv);
+    });
+  }
+
+  function pickMessage() {
+    const idx = Math.floor(Math.random() * MESSAGES.length);
+    currentMessage = MESSAGES[idx];
+  }
+
+  function clearBulbs() {
+    Object.values(bulbMap).forEach(b => b.classList.remove("on"));
+  }
+
+  async function playSequence() {
+    sequenceRunning = true;
+    startBtn.disabled = true;
+    replayBtn.disabled = true;
+    hintBtn.disabled = true;
+    guessBtn.disabled = true;
+    guessInput.disabled = true;
+    spelledEl.textContent = "";
+    messageEl.textContent = "";
+    messageEl.className = "message";
+    clearBulbs();
+
+    for (const ch of currentMessage) {
+      if (ch === " ") {
+        spelledEl.textContent += "  ";
+        await sleep(350);
+        continue;
+      }
+      const bulb = bulbMap[ch];
+      bulb.classList.add("on");
+      await sleep(550);
+      bulb.classList.remove("on");
+      spelledEl.textContent += ch;
+      await sleep(200);
+    }
+
+    sequenceRunning = false;
+    replayBtn.disabled = false;
+    hintBtn.disabled = false;
+    guessBtn.disabled = false;
+    guessInput.disabled = false;
+  }
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  startBtn.addEventListener("click", () => {
+    pickMessage();
+    playSequence();
+  });
+
+  replayBtn.addEventListener("click", () => {
+    if (!sequenceRunning) playSequence();
+  });
+
+  hintBtn.addEventListener("click", () => {
+    messageEl.textContent = 'Pista: la primera letra es "' + currentMessage[0] + '"';
+    messageEl.className = "message";
+  });
+
+  guessBtn.addEventListener("click", () => {
+    const guess = guessInput.value.trim().toUpperCase().replace(/[^A-Z ]/g, "");
+    const target = currentMessage.replace(/[^A-Z ]/g, "");
+    if (guess === target) {
+      messageEl.textContent = 'Correcto! El mensaje era: "' + currentMessage + '"';
+      messageEl.className = "message win";
+    } else {
+      messageEl.textContent = "Casi... intentalo de nuevo o pide una pista.";
+      messageEl.className = "message lose";
+    }
+  });
+
+  buildBoard();
+</script>
+</body>
+</html>
